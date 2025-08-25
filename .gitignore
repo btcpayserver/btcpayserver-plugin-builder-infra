@@ -1,0 +1,12 @@
+.env
+mattermost.toml
+matterbridge.toml
+.gitconfig
+.ssh/
+.vim/
+.bash_history
+.bashrc
+.profile
+.viminfo
+snap/
+.idea
