@@ -65,6 +65,7 @@ services:
       PB_DEBUGLOG: debug.log
       PB_DEBUGLOGLEVEL: Debug,
       PB_DEBUGLOGRETAINCOUNT: 3
+      PB_GITHUB_TOKEN: ${PB_GITHUB_TOKEN}
       VIRTUAL_HOST_NAME: pluginbuilder
       VIRTUAL_HOST: ${PB_HOST}
       VIRTUAL_PORT: 8080
