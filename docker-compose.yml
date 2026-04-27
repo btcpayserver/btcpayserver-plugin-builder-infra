@@ -58,7 +58,7 @@ services:
 
   plugin-builder:
     restart: unless-stopped
-    image: btcpayserver/btcpayserver-plugin-builder:v1.0.64
+    image: btcpayserver/btcpayserver-plugin-builder:v1.0.65
     environment:
       XDG_CONFIG_HOME: /datadir
       PB_POSTGRES: Application Name=plugin-builder;User ID=postgres;Host=postgres;Port=5432;Database=pluginbuilder
