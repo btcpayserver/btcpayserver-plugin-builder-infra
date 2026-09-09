@@ -58,7 +58,7 @@ services:
 
   plugin-builder:
     restart: unless-stopped
-    image: btcpayserver/btcpayserver-plugin-builder:v1.0.74
+    image: btcpayserver/btcpayserver-plugin-builder:v1.0.75
     environment:
       DOCKER_STARTUP_SKIP_BUILD: "true"
       XDG_CONFIG_HOME: /datadir
