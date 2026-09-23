@@ -1,0 +1,40 @@
+name: Validate Compose
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  release-tags:
+    name: Matching release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and release tags
+        env:
+          PB_BUILD_SCRATCH_ROOT: /tmp/pluginbuilder-scratch
+          PB_BUILD_BROKER_TOKEN_FILE: /tmp/pluginbuilder-token
+          PB_STORAGE_CONNECTION_STRING: validation-only
+          PB_HOST: validation.invalid
+          PB_GITHUB_TOKEN: ""
+          PB_BTCMAPS_BTCMAP_IMPORT_TOKEN: ""
+          PB_BTCMAPS_DIRECTORY_GITHUB_TOKEN: ""
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file /dev/null config --format json | jq -e '
+            [ .services["plugin-builder"].image,
+              .services["build-broker"].image,
+              .services["build-broker"].environment.PBB_WORKER_IMAGE ]
+            | map(capture(":(?<tag>v[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9_.-]+)?)$").tag)
+            | if length == 3 and (unique | length) == 1 then
+                "All build images use " + .[0]
+              else
+                error("Application, broker and worker must use the same explicit release tag")
+              end
+          '
