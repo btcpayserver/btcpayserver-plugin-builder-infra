@@ -1,29 +1,67 @@
 # btcpayserver-plugin-builder-infra
 The docker compose running the services for the BTCPay Server Plugin.
 
-## How to use
+## First deployment
 
-Create a `.env` file with the following content:
+Use a Linux/amd64 Docker host with gVisor installed, then prepare the runtime and
+the private build directory:
+
+```bash
+sudo runsc install
+sudo systemctl restart docker
+docker info --format '{{json .Runtimes}}'
+sudo install -d -m 0700 /mnt/pluginbuilder-build-scratch
+```
+
+The runtime list must contain `runsc`. The scratch directory must contain only
+disposable build data and must not be a symlink or filesystem root.
+
+Keep Docker's network firewall rules enabled. The broker creates an internal
+worker network and a Squid proxy with a restricted destination policy.
+Custom host firewall rules are optional defense in depth, not a prerequisite
+for deployment: they can limit network access if the proxy itself is compromised.
+Validate network isolation and a complete build on the VM before opening builds
+to users.
+
+Create the shared broker token outside the repository:
+
+```bash
+sudo install -d -m 0700 /etc/pluginbuilder/secrets
+sudo bash -c '
+  umask 077
+  set -o noclobber
+  openssl rand -hex 32 > /etc/pluginbuilder/secrets/build-broker-token
+'
+```
+
+Create a private `.env` file:
 
 ```ini
 PB_STORAGE_CONNECTION_STRING=<AZURE-STORAGE-CONNECTION-STRING>
 PB_HOST=<DOMAIN-NAME>
+PB_BUILD_SCRATCH_ROOT=/mnt/pluginbuilder-build-scratch
+PB_BUILD_BROKER_TOKEN_FILE=/etc/pluginbuilder/secrets/build-broker-token
 ```
 
-Where you should replace:
+`PB_BUILD_BROKER_TOKEN_FILE` is the absolute path, not the token value.
 
-* `<AZURE-STORAGE-CONNECTION-STRING>`: Replace with a connection string from a azure storage account. This is where the built plugins are hosted.
-* `<DOMAIN-NAME>`: The domain name of your plugin builder website. HTTPS will be provisioned by let's encrypt automatically.
-
-## Updating Services
-
-If you need to update the version of a service (e.g., Plugin Builder), follow these steps:
-
-1. Update the `docker-compose.yml` file in the repository and push commit.
-2. On the server, run the following commands:
+Validate the configuration and start the deployment:
 
 ```bash
-git fetch
+docker compose config --quiet
+docker compose up -d --wait --wait-timeout 1200
+docker compose ps
+```
+
+## Updates
+
+Release the application, broker and worker with the same version and update
+all three tags in `docker-compose.yml`. CI checks that their release tags match.
+The broker pulls its pinned upstream Squid proxy image itself.
+Drain builds before deploying:
+
+```bash
 git pull
-docker compose up -d
+docker compose config --quiet
+docker compose up -d --wait --wait-timeout 1200
 ```
