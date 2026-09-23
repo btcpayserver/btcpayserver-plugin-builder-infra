@@ -1,4 +1,4 @@
-version: "3"
+x-broker-token-path: &broker-token-path /run/secrets/build_broker_token
 
 services:
   nginx:
@@ -58,8 +58,12 @@ services:
 
   plugin-builder:
     restart: unless-stopped
+    stop_grace_period: 210s
     image: btcpayserver/btcpayserver-plugin-builder:v1.0.77
+    pull_policy: always
     environment:
+      PB_BUILD_BROKER_URL: http://build-broker:8080
+      PB_BUILD_BROKER_TOKEN_FILE: *broker-token-path
       XDG_CONFIG_HOME: /datadir
       PB_POSTGRES: Application Name=plugin-builder;User ID=postgres;Host=postgres;Port=5432;Database=pluginbuilder
       PB_STORAGE_CONNECTION_STRING: ${PB_STORAGE_CONNECTION_STRING}
@@ -78,7 +82,64 @@ services:
       - "8080"
     volumes:
       - "pluginbuilder_datadir:/datadir"
-      - /var/run/docker.sock:/var/run/docker.sock
+    # Only completed, hash-verified broker downloads are buffered here. This is
+    # private app storage, not a host scratch mount shared with build workers.
+    tmpfs:
+      - /datadir/BTCPayServer-PluginBuilder/broker-staging:rw,noexec,nosuid,nodev,size=600m,mode=0700
+    secrets:
+      - source: build_broker_token
+        target: *broker-token-path
+    networks:
+      - default
+      - build_control
+
+  build-broker:
+    restart: unless-stopped
+    image: btcpayserver/btcpayserver-plugin-builder-broker:v1.0.77
+    pull_policy: always
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      PBB_WORKER_IMAGE: btcpayserver/btcpayserver-plugin-builder-worker:v1.0.77
+      PBB_BUILD_SCRATCH_ROOT: ${PB_BUILD_SCRATCH_ROOT:?Set PB_BUILD_SCRATCH_ROOT to an existing private scratch directory}
+      PBB_TOKEN_FILE: *broker-token-path
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 210s
+    healthcheck:
+      # The executable reads the token file; it never puts the token in argv.
+      test: ["CMD", "/app/PluginBuilder.BuildBroker", "--healthcheck"]
+      interval: 15s
+      timeout: 10s
+      start_period: 15m
+      retries: 3
+    volumes:
+      # Never share the application's data volume or credentials with the broker.
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      # The scratch path must be identical on the Docker host and in the broker.
+      - type: bind
+        source: ${PB_BUILD_SCRATCH_ROOT:?Set PB_BUILD_SCRATCH_ROOT}
+        target: ${PB_BUILD_SCRATCH_ROOT:?Set PB_BUILD_SCRATCH_ROOT}
+        bind:
+          create_host_path: false
+    secrets:
+      - source: build_broker_token
+        target: *broker-token-path
+    networks:
+      - build_control
+
+networks:
+    default:
+    # Only the API and broker join this network. It has no external route.
+    build_control:
+      internal: true
+
+secrets:
+    build_broker_token:
+      file: ${PB_BUILD_BROKER_TOKEN_FILE:?Set PB_BUILD_BROKER_TOKEN_FILE to a private absolute token-file path}
 
 volumes:
     nginx_conf:
