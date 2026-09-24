@@ -59,7 +59,7 @@ services:
   plugin-builder:
     restart: unless-stopped
     stop_grace_period: 210s
-    image: btcpayserver/btcpayserver-plugin-builder:v1.0.77
+    image: btcpayserver/btcpayserver-plugin-builder:v1.0.78
     pull_policy: always
     environment:
       PB_BUILD_BROKER_URL: http://build-broker:8080
@@ -95,11 +95,11 @@ services:
 
   build-broker:
     restart: unless-stopped
-    image: btcpayserver/btcpayserver-plugin-builder-broker:v1.0.77
+    image: btcpayserver/btcpayserver-plugin-builder-broker:v1.0.78
     pull_policy: always
     environment:
       ASPNETCORE_URLS: http://+:8080
-      PBB_WORKER_IMAGE: btcpayserver/btcpayserver-plugin-builder-worker:v1.0.77
+      PBB_WORKER_IMAGE: btcpayserver/btcpayserver-plugin-builder-worker:v1.0.78
       PBB_BUILD_SCRATCH_ROOT: ${PB_BUILD_SCRATCH_ROOT:?Set PB_BUILD_SCRATCH_ROOT to an existing private scratch directory}
       PBB_TOKEN_FILE: *broker-token-path
     security_opt:
