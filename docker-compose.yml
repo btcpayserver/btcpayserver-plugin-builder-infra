@@ -85,7 +85,7 @@ services:
     # Only completed, hash-verified broker downloads are buffered here. This is
     # private app storage, not a host scratch mount shared with build workers.
     tmpfs:
-      - /datadir/BTCPayServer-PluginBuilder/broker-staging:rw,noexec,nosuid,nodev,size=600m,mode=0700
+      - /datadir/BTCPayServer-PluginBuilder/broker-staging:rw,noexec,nosuid,nodev,size=800m,mode=0700
     secrets:
       - source: build_broker_token
         target: *broker-token-path
