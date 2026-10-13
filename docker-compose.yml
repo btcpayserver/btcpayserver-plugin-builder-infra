@@ -67,6 +67,8 @@ services:
       XDG_CONFIG_HOME: /datadir
       PB_POSTGRES: Application Name=plugin-builder;User ID=postgres;Host=postgres;Port=5432;Database=pluginbuilder
       PB_STORAGE_CONNECTION_STRING: ${PB_STORAGE_CONNECTION_STRING}
+      PB_TURNSTILE_SITEKEY: ${PB_TURNSTILE_SITEKEY:-}
+      PB_TURNSTILE_SECRET: ${PB_TURNSTILE_SECRET:-}
       PB_DEBUGLOG: debug.log
       PB_DEBUGLOGLEVEL: Debug,
       PB_DEBUGLOGRETAINCOUNT: 3
