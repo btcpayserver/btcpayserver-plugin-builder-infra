@@ -79,7 +79,7 @@ services:
       # nginx sends this vhost's trimmed access log here over syslog (see nginx.tmpl); admins read it
       # at /api/v1/admin/access-log. UDP on the compose network only: never publish this port.
       PB_ACCESSLOG_SYSLOG_PORT: "5514"
-      ACCESS_LOG_SYSLOG: plugin-builder:5514
+      ACCESS_LOG_SYSLOG_PORT: "5514"
       VIRTUAL_HOST_NAME: pluginbuilder
       VIRTUAL_HOST: ${PB_HOST}
       VIRTUAL_PORT: 8080
