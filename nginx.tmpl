@@ -69,6 +69,26 @@ log_format vhost '$host $remote_addr - $remote_user [$time_local] '
                  '"$request" $status $body_bytes_sent '
                  '"$http_referer" "$http_user_agent"';
 
+# Trimmed access log for the plugin builder's abuse correlation (sent over syslog where a container sets
+# ACCESS_LOG_SYSLOG_PORT). $uri carries no query string, which can hold credentials.
+# Cap fields before JSON escaping: repeated headers and control bytes can otherwise exceed UDP's datagram limit.
+# Use the receiver's field limits as byte caps to keep even worst-case escaping below 18 KB.
+map $host $pbaccess_host {
+  "~(?s)^(?<pbaccess_host_prefix>.{0,255})" $pbaccess_host_prefix;
+}
+map $request_method $pbaccess_method {
+  "~(?s)^(?<pbaccess_method_prefix>.{0,16})" $pbaccess_method_prefix;
+}
+map $uri $pbaccess_path {
+  "~(?s)^(?<pbaccess_path_prefix>.{0,2048})" $pbaccess_path_prefix;
+}
+map $http_user_agent $pbaccess_user_agent {
+  "~(?s)^(?<pbaccess_user_agent_prefix>.{0,512})" $pbaccess_user_agent_prefix;
+}
+
+log_format pbaccess escape=json '{"time":"$time_iso8601","ip":"$remote_addr","host":"$pbaccess_host","method":"$pbaccess_method",'
+                                '"path":"$pbaccess_path","status":$status,"bytes":$body_bytes_sent,"ua":"$pbaccess_user_agent"}';
+
 access_log off;
 
 {{ if $.Env.RESOLVERS }}
@@ -127,6 +147,7 @@ server {
 {{ $host := trim $host }}
 {{ $is_regexp := hasPrefix "~" $host }}
 {{ $upstream_name := when $is_regexp (sha1 $host) $host }}
+{{ $access_log_syslog := "" }}
 
 # {{ $host }}
 upstream {{ $upstream_name }} {
@@ -138,6 +159,10 @@ upstream {{ $upstream_name }} {
 		{{ range $containerNetwork := $container.Networks }}
 			{{ if (and (ne $containerNetwork.Name "ingress") (or (eq $knownNetwork.Name $containerNetwork.Name) (eq $knownNetwork.Name "host"))) }}
 				## Can be connected with "{{ $containerNetwork.Name }}" network
+				{{/* Use the reachable IP so a missing syslog DNS name cannot prevent nginx from starting. */}}
+				{{ if and $containerNetwork.IP $container.Env.ACCESS_LOG_SYSLOG_PORT }}
+					{{ $access_log_syslog = printf "%s:%s" $containerNetwork.IP $container.Env.ACCESS_LOG_SYSLOG_PORT }}
+				{{ end }}
 
 				{{/* If only 1 port exposed, use that */}}
 				{{ if eq $addrLen 1 }}
@@ -204,6 +229,9 @@ server {
 	listen [::]:80 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
+	{{ if $access_log_syslog }}
+	access_log syslog:server={{ $access_log_syslog }},tag=pbaccess,nohostname pbaccess;
+	{{ end }}
 	return 301 https://$host$request_uri;
 }
 {{ end }}
@@ -216,6 +244,9 @@ server {
 	listen [::]:443 ssl http2 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
+	{{ if $access_log_syslog }}
+	access_log syslog:server={{ $access_log_syslog }},tag=pbaccess,nohostname pbaccess;
+	{{ end }}
 
 	{{ if eq $network_tag "internal" }}
 	# Only allow traffic from internal clients
@@ -358,6 +389,9 @@ server {
 	listen [::]:80 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
+	{{ if $access_log_syslog }}
+	access_log syslog:server={{ $access_log_syslog }},tag=pbaccess,nohostname pbaccess;
+	{{ end }}
 
 	{{ if eq $network_tag "internal" }}
 	# Only allow traffic from internal clients
@@ -401,6 +435,9 @@ server {
 	listen [::]:443 ssl http2 {{ $default_server }};
 	{{ end }}
 	access_log /var/log/nginx/access.log vhost;
+	{{ if $access_log_syslog }}
+	access_log syslog:server={{ $access_log_syslog }},tag=pbaccess,nohostname pbaccess;
+	{{ end }}
 	return 500;
 
 	ssl_certificate /etc/nginx/certs/default.crt;
