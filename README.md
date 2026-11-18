@@ -65,3 +65,29 @@ git pull
 docker compose config --quiet
 docker compose up -d --wait --wait-timeout 1200
 ```
+
+### Nginx template updates
+
+A change to the bind-mounted `nginx.tmpl` does not recreate `nginx-gen` during
+`docker compose up`. After the update commands above, restart the generator to
+render the updated template. The generator also signals Nginx to reload:
+
+```bash
+docker compose restart nginx-gen
+docker compose logs --since 2m nginx-gen
+docker compose exec nginx nginx -t
+docker compose logs --since 2m nginx
+```
+
+Confirm successful template generation and reload in the logs. If generation or
+validation fails, the mitigation is not verified: fix the error and repeat the
+steps. Inspect `docker compose exec nginx nginx -T` on the host to verify the
+effective configuration; do not share its output if it contains private settings.
+
+HTTP/2 is temporarily disabled on every HTTPS listener to mitigate
+[CVE-2026-123007 and CVE-2026-123633](https://nginx.org/en/security_advisories.html).
+Verify that the effective configuration has no `http2` listener parameter or
+`http2 on` directive, including custom vhost configuration. This mitigation does
+not replace upgrading to a fixed Nginx image (1.30.7+ or 1.31.9+). After changing
+the image tag, pull the image and recreate the Nginx container; a configuration
+reload alone cannot update its binary.
